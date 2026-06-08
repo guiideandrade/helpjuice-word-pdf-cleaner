@@ -16,7 +16,8 @@ import {
   normalizeWhitespace,
   fixLinks,
 } from './transforms.js';
-import { validate } from './validators.js';
+import { validate, detectBlockInInline } from './validators.js';
+import { sanitizeHtml } from './sanitize.js';
 
 // Returns { html, transforms, findings }
 export function runPipeline(rawHtml) {
@@ -45,8 +46,13 @@ export function runPipeline(rawHtml) {
   // 15: Validate (read-only)
   const findings = validate(doc);
 
-  // Serialize output
-  const html = doc.body.innerHTML.trim();
+  // Q5: raw-input scan for block-inside-inline nesting the browser silently
+  // reflowed during parse. Prepend so it surfaces near the top of the report.
+  const reflow = detectBlockInInline(rawHtml);
+  if (reflow) findings.unshift(reflow);
+
+  // 16: Final safety net — DOMPurify over the serialized output (HANDOFF Q2).
+  const html = sanitizeHtml(doc.body.innerHTML.trim()).trim();
 
   return { html, transforms, findings, doc };
 }

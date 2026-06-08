@@ -1,5 +1,24 @@
 # Changelog
 
+## v2.1.0 — 2026-06-08
+
+Resolves the five HANDOFF scope questions.
+
+### Added
+- **Build toolchain** — Vite + npm. `npm run dev` (HMR), `npm run build` → a single inlined `dist/index.html` (`vite-plugin-singlefile`) that works from `file://`, `npm test` (Vitest, jsdom).
+- **DOMPurify final safety net** (Q2) — `src/sanitize.js` runs DOMPurify (HTML-only profile, no SVG/MathML) as the last pipeline step, after all explicit passes.
+- **Vitest test suite** — regression coverage for the four v2.0.1 defects plus Q4/Q5 and the sanitizer.
+- **`strip-dimensions` autofix** (Q4) — `img-fixed-dimensions` is now one-click fixable; removes Word's fixed `width`/`height` so images scale fluidly.
+- **Block-inside-inline detector** (Q5) — `detectBlockInInline()` scans the raw input for block tags nested in inline tags (`<div>` inside `<b>`) and warns that `DOMParser` will silently reflow the structure.
+
+### Changed
+- UI controller extracted from inline `index.html` script into `src/main.js` (so Vite bundles it).
+- Post-autofix re-serialization now also runs through the DOMPurify net.
+
+### Decisions
+- Q1 (class allow-list): won't fix — keep stripping all classes.
+- Q3 (PDF backend): scoped out — "convert to HTML first, then paste" is permanent; no backend.
+
 ## v2.0.1 — 2026-06-08
 
 ### Fixed

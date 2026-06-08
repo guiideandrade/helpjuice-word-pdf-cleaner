@@ -73,9 +73,10 @@ function imgFixedDimensions(doc) {
     rule: 'img-fixed-dimensions',
     severity: 'low',
     category: 'performance',
-    message: `${bad.length} image(s) have fixed width/height attributes from Word — verify they match your KB layout`,
+    message: `${bad.length} image(s) have fixed width/height attributes from Word — verify they match your KB layout, or remove them to scale fluidly`,
     nodes: bad,
-    autofixable: false,
+    autofixable: true,
+    autofix: 'strip-dimensions',
   };
 }
 
@@ -323,6 +324,8 @@ export const AUTOFIXES = {
     a.setAttribute('rel', rel.join(' '));
   }),
   'strip-href':         (nodes) => nodes.forEach(a => a.removeAttribute('href')),
+  // Q4: remove Word's fixed pixel dimensions so images scale fluidly to the KB's CSS.
+  'strip-dimensions':   (nodes) => nodes.forEach(n => { n.removeAttribute('width'); n.removeAttribute('height'); }),
   'unwrap':             (nodes) => nodes.forEach(n => {
     const parent = n.parentNode;
     if (!parent) return;
@@ -397,4 +400,53 @@ export function applyFixOption(fixKey, nodes, doc) {
   if (!fixFn) return false;
   fixFn(nodes, doc);
   return true;
+}
+
+// ─── Q5: block-inside-inline reflow detector (raw-input scan) ─────────────────
+// Word emits invalid nesting like <b><div>text</div></b>. DOMParser silently
+// reflows this into valid HTML, usually splitting the inline element, so the
+// cleaned structure can differ from what was pasted. This scans the *raw* string
+// (before parsing) and warns. It runs in pipeline.js, not in the DOM RULES list.
+const INLINE_TAGS = new Set([
+  'a', 'b', 'i', 'em', 'strong', 'u', 'span', 'small', 'sub', 'sup', 'mark',
+  'abbr', 'cite', 'code', 'q', 's', 'strike', 'font', 'label', 'big', 'tt',
+]);
+const BLOCK_TAGS = new Set([
+  'div', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'table',
+  'thead', 'tbody', 'tfoot', 'tr', 'td', 'th', 'blockquote', 'section',
+  'article', 'aside', 'header', 'footer', 'figure', 'figcaption', 'pre', 'hr',
+]);
+const VOID_TAGS = new Set([
+  'img', 'br', 'hr', 'input', 'meta', 'link', 'col', 'area', 'base',
+  'source', 'track', 'wbr',
+]);
+
+export function detectBlockInInline(rawHtml) {
+  if (!rawHtml) return null;
+  const tagRe = /<(\/?)([a-zA-Z][a-zA-Z0-9]*)\b[^>]*?(\/?)>/g;
+  const stack = [];
+  let m;
+  let hits = 0;
+  while ((m = tagRe.exec(rawHtml))) {
+    const closing = m[1] === '/';
+    const tag = m[2].toLowerCase();
+    const selfClose = m[3] === '/' || VOID_TAGS.has(tag);
+    if (closing) {
+      for (let i = stack.length - 1; i >= 0; i--) {
+        if (stack[i] === tag) { stack.length = i; break; }
+      }
+    } else if (!selfClose) {
+      if (BLOCK_TAGS.has(tag) && stack.some(t => INLINE_TAGS.has(t))) hits++;
+      stack.push(tag);
+    }
+  }
+  if (!hits) return null;
+  return {
+    rule: 'block-inside-inline',
+    severity: 'medium',
+    category: 'html',
+    message: `${hits} block element(s) nested inside inline element(s) in the source (e.g. <div> inside <b>). The browser silently reflows this, so the cleaned structure may differ from what you pasted — review the output.`,
+    nodes: [],
+    autofixable: false,
+  };
 }
