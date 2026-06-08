@@ -19,7 +19,9 @@ Paste Word/PDF HTML into the left pane. The tool auto-cleans on paste and render
 
 `npm run build` produces a single self-contained `dist/index.html` (all JS/CSS inlined via `vite-plugin-singlefile`). It works from any static host **and** from a plain `file://` URL.
 
-The recommended host is **GitHub Pages** — point Pages at the build output (e.g. a `gh-pages` branch or `/docs`), or serve `dist/index.html` from any static server.
+**Deployment is automated.** `.github/workflows/deploy.yml` runs the test suite and build on every PR, and on every push to `main` it builds and publishes `dist/` to **GitHub Pages**. One-time setup: in the repo settings, set **Pages → Build and deployment → Source** to **GitHub Actions**.
+
+To host elsewhere, just serve the built `dist/index.html` from any static server.
 
 ## Architecture
 
@@ -29,7 +31,7 @@ src/
 ├── main.js           UI controller — event bindings, clean/report/copy flow
 ├── pipeline.js       Orchestrator — 14 transform passes → validate → DOMPurify net
 ├── transforms.js     14 named, single-responsibility transform passes
-├── validators.js     18 validation rules + autofixes + block-in-inline detector
+├── validators.js     17 validation rules + autofixes + block-in-inline detector
 ├── report.js         Report panel renderer + copy gate
 ├── attr-policy.js    Per-element attribute allow-list + URL scheme validator
 └── sanitize.js       DOMPurify final safety net (HTML-only profile)
