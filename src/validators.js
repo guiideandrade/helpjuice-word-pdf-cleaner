@@ -2,7 +2,10 @@
 // Returns an array of Finding objects; never mutates the DOM.
 //
 // Finding shape:
-// { rule, severity, category, message, nodes, autofixable }
+// { rule, severity, category, message, nodes, autofixable, autofix?, fixOptions?, needsInput? }
+//
+// fixOptions: [{ label, fix }] — renders multiple fix buttons instead of one.
+// needsInput: true — report.js renders an <input> whose value is passed to applyAutofix.
 
 const POOR_ANCHOR_TEXTS = [
   'click here', 'here', 'read more', 'more', 'link', 'this link',
@@ -21,7 +24,11 @@ function imgMissingAlt(doc) {
     message: `${bad.length} image(s) missing alt text`,
     nodes: bad,
     autofixable: true,
-    autofix: 'add-empty-alt',
+    // Two fix paths: author confirms decorative (alt="") vs. needs description (placeholder).
+    fixOptions: [
+      { label: 'Mark decorative (alt="")', fix: 'mark-decorative' },
+      { label: 'Add placeholder', fix: 'add-placeholder-alt' },
+    ],
   };
 }
 
@@ -53,6 +60,20 @@ function imgDataUri(doc) {
     severity: 'medium',
     category: 'performance',
     message: `${bad.length} image(s) embedded as data URIs (~${kb} KB) — consider hosting separately`,
+    nodes: bad,
+    autofixable: false,
+  };
+}
+
+// AUDIT §1.4 — Word exports pixel values that may reflect document DPI/zoom, not target layout.
+function imgFixedDimensions(doc) {
+  const bad = Array.from(doc.querySelectorAll('img[width], img[height]'));
+  if (!bad.length) return null;
+  return {
+    rule: 'img-fixed-dimensions',
+    severity: 'low',
+    category: 'performance',
+    message: `${bad.length} image(s) have fixed width/height attributes from Word — verify they match your KB layout`,
     nodes: bad,
     autofixable: false,
   };
@@ -177,7 +198,7 @@ function linkPoorAnchorText(doc) {
 }
 
 function deprecatedElement(doc) {
-  const DEPRECATED = ['font', 'center', 'big', 'small', 'tt', 'strike', 's', 'u'];
+  const DEPRECATED = ['font', 'center', 'big', 'small', 'tt', 'strike', 's'];
   const bad = Array.from(doc.querySelectorAll(DEPRECATED.join(',')));
   if (!bad.length) return null;
   const byTag = {};
@@ -228,9 +249,12 @@ function tableNoCaption(doc) {
     rule: 'table-no-caption',
     severity: 'medium',
     category: 'a11y',
-    message: `${bad.length} table(s) have no caption`,
+    message: `${bad.length} table(s) have no caption — describe what the table contains`,
     nodes: bad,
-    autofixable: false,
+    autofixable: true,
+    autofix: 'add-caption',
+    needsInput: true,
+    inputPlaceholder: bad.length === 1 ? 'Enter caption text...' : 'Caption text (applied to all tables)...',
   };
 }
 
@@ -249,7 +273,6 @@ function pInsideLi(doc) {
 }
 
 function doubleBrAsParagraph(doc) {
-  // Find adjacent <br> pairs that act as paragraph breaks
   const bad = Array.from(doc.querySelectorAll('br')).filter(br => {
     const next = br.nextSibling;
     return next && next.nodeType === 1 && next.tagName === 'BR';
@@ -266,11 +289,29 @@ function doubleBrAsParagraph(doc) {
   };
 }
 
+// AUDIT §4.4 — <u> in HTML5 means "unarticulated annotation", not visual underline.
+// Word uses it purely for styling; it looks like a link but is not one.
+function uVisualUnderline(doc) {
+  const bad = Array.from(doc.querySelectorAll('u'));
+  if (!bad.length) return null;
+  return {
+    rule: 'u-visual-underline',
+    severity: 'low',
+    category: 'a11y',
+    message: `${bad.length} <u> element(s) — HTML5 <u> means "annotation", not underline; Word uses it purely for styling, which can be mistaken for a link by readers`,
+    nodes: bad,
+    autofixable: false,
+  };
+}
+
 // ─── Auto-fix implementations ─────────────────────────────────────────────────
 export const AUTOFIXES = {
-  'add-empty-alt': (nodes) => nodes.forEach(n => n.setAttribute('alt', '')),
-  'remove': (nodes) => nodes.forEach(n => n.remove()),
-  'demote-h1': (nodes, doc) => nodes.forEach(n => {
+  // img-missing-alt: two paths selected by the user in the report panel
+  'mark-decorative':    (nodes) => nodes.forEach(n => n.setAttribute('alt', '')),
+  'add-placeholder-alt':(nodes) => nodes.forEach(n => n.setAttribute('alt', '[describe this image]')),
+
+  'remove':             (nodes) => nodes.forEach(n => n.remove()),
+  'demote-h1':          (nodes, doc) => nodes.forEach(n => {
     const h2 = doc.createElement('h2');
     h2.innerHTML = n.innerHTML;
     n.replaceWith(h2);
@@ -281,32 +322,39 @@ export const AUTOFIXES = {
     if (!rel.includes('noreferrer')) rel.push('noreferrer');
     a.setAttribute('rel', rel.join(' '));
   }),
-  'strip-href': (nodes) => nodes.forEach(a => a.removeAttribute('href')),
-  'unwrap': (nodes) => nodes.forEach(n => {
+  'strip-href':         (nodes) => nodes.forEach(a => a.removeAttribute('href')),
+  'unwrap':             (nodes) => nodes.forEach(n => {
     const parent = n.parentNode;
     if (!parent) return;
     while (n.firstChild) parent.insertBefore(n.firstChild, n);
     n.remove();
   }),
-  'semantic-convert': (nodes, doc) => nodes.forEach(n => {
+  'semantic-convert':   (nodes, doc) => nodes.forEach(n => {
     const tag = n.tagName.toLowerCase() === 'b' ? 'strong' : 'em';
     const el = doc.createElement(tag);
     el.innerHTML = n.innerHTML;
     n.replaceWith(el);
   }),
-  'unwrap-deprecated': (nodes) => nodes.forEach(n => {
+  'unwrap-deprecated':  (nodes) => nodes.forEach(n => {
     const parent = n.parentNode;
     if (!parent) return;
     while (n.firstChild) parent.insertBefore(n.firstChild, n);
     n.remove();
   }),
-  'br-to-p': (nodes, doc) => nodes.forEach(br => {
+  'br-to-p':            (nodes, doc) => nodes.forEach(br => {
     if (!br.parentNode) return;
     const next = br.nextSibling;
     if (next && next.nodeType === 1 && next.tagName === 'BR') next.remove();
     const p = doc.createElement('p');
     p.innerHTML = '<br>';
     br.parentNode.replaceChild(p, br);
+  }),
+  // inputValue is the caption text typed by the user in the report panel input field.
+  'add-caption':        (nodes, doc, inputValue) => nodes.forEach(table => {
+    if (table.querySelector('caption')) return;
+    const caption = doc.createElement('caption');
+    caption.textContent = (inputValue || '').trim() || 'Table';
+    table.insertBefore(caption, table.firstChild);
   }),
 };
 
@@ -315,6 +363,7 @@ const RULES = [
   imgMissingAlt,
   imgLocalSrc,
   imgDataUri,
+  imgFixedDimensions,
   headingSkippedLevel,
   headingEmpty,
   headingH1InBody,
@@ -328,15 +377,24 @@ const RULES = [
   tableNoCaption,
   pInsideLi,
   doubleBrAsParagraph,
+  uVisualUnderline,
 ];
 
 export function validate(doc) {
   return RULES.map(fn => fn(doc)).filter(Boolean);
 }
 
-export function applyAutofix(finding, doc) {
+// inputValue is only used for rules with needsInput: true (currently: add-caption).
+export function applyAutofix(finding, doc, inputValue) {
   const fixFn = AUTOFIXES[finding.autofix];
   if (!fixFn) return false;
-  fixFn(finding.nodes, doc);
+  fixFn(finding.nodes, doc, inputValue);
+  return true;
+}
+
+export function applyFixOption(fixKey, nodes, doc) {
+  const fixFn = AUTOFIXES[fixKey];
+  if (!fixFn) return false;
+  fixFn(nodes, doc);
   return true;
 }
