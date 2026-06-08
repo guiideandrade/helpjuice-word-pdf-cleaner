@@ -26,7 +26,8 @@ export const ATTR_POLICY = {
 export const ATTR_PREFIX_ALLOW = ['aria-', 'data-'];
 
 // Schemes that are never allowed in href/src.
-export const BANNED_SCHEMES = ['javascript:', 'vbscript:', 'data:text/', 'data:application/'];
+// data:image/svg is banned because SVG can carry inline <script>/event handlers.
+export const BANNED_SCHEMES = ['javascript:', 'vbscript:', 'data:text/', 'data:application/', 'data:image/svg'];
 
 // data: URIs with these MIME prefixes are allowed (images only).
 export const ALLOWED_DATA_MIME = ['data:image/'];

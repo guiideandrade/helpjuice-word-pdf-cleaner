@@ -53,7 +53,7 @@ v2/
 6. Selective span unwrap (keep `lang`/`aria-*`/`role` spans)
 7. Normalize underline runs (merge adjacent `<u>`)
 8. Heading cleanup: strip `<a>` from headings, remove empties, detect H1 + skipped levels
-9. List conversion: bullet/OL detection, `<p>`-in-`<li>` unwrap, `<br><br>` → `<p>`
+9. List conversion: bullet/OL detection, `<p>`-in-`<li>` unwrap (double-`<br>` → `<p>` is surfaced as a one-click report fix, not collapsed silently)
 10. Table accessibility: promote `<thead>`, add `border-style`
 11. Image fixes: single-image tables → `<figure>/<figcaption>`, add `loading`/`decoding`
 12. Apply per-element attribute policy (SPECS.md §8)

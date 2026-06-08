@@ -50,6 +50,7 @@ export function securityStrip(doc) {
     const lower = v.trim().toLowerCase();
     return lower.startsWith('javascript:') ||
            lower.startsWith('vbscript:') ||
+           lower.startsWith('data:image/svg') ||  // SVG can carry inline script
            (lower.startsWith('data:') && !lower.startsWith('data:image/'));
   };
 
@@ -133,16 +134,17 @@ export function selectiveSpanUnwrap(doc) {
 export function normalizeUnderlineRuns(doc) {
   let count = 0;
   doc.querySelectorAll('u').forEach(u => {
-    let text = u.textContent || '';
+    if (!u.parentNode) return;
+    // Merge only directly-adjacent <u> runs; move children (don't flatten to text,
+    // which would destroy nested markup like <u><a href>link</a></u>).
     let next = u.nextSibling;
     while (next && next.nodeType === 1 && next.tagName === 'U') {
-      text += next.textContent || '';
+      while (next.firstChild) u.appendChild(next.firstChild);
       const rm = next;
       next = next.nextSibling;
       rm.remove();
       count++;
     }
-    u.textContent = text;
   });
   return { name: 'Normalize underline runs (merge adjacent <u>)', count };
 }
@@ -307,25 +309,16 @@ export function convertLists(doc) {
     pInLi++;
   });
 
-  // Convert <br><br> sequences to <p> boundaries
-  let brBr = 0;
-  doc.querySelectorAll('br + br').forEach(br => {
-    const prev = br.previousSibling;
-    if (prev && prev.nodeType === 1 && prev.tagName === 'BR') {
-      // wrap content between previous structural boundary and here in <p>
-      br.remove();
-      if (prev.parentNode) prev.remove();
-      brBr++;
-    }
-  });
+  // Double-<br> paragraph breaks are surfaced by the `double-br-as-paragraph`
+  // validator with a one-click `br-to-p` autofix. We deliberately do NOT collapse
+  // them here — silently deleting both <br>s merged adjacent lines with no break.
 
   return {
-    name: 'List conversion, p-in-li unwrap, br×2→p',
+    name: 'List conversion, p-in-li unwrap',
     count: listsCreated,
     detail: [
       listsCreated && `${listsCreated} list(s) created`,
       pInLi && `${pInLi} <p>-in-<li> unwrapped`,
-      brBr && `${brBr} double-<br> converted`,
     ].filter(Boolean).join('; '),
   };
 }
@@ -386,9 +379,11 @@ export function fixImages(doc) {
 
     // Check for caption text
     let captionText = '';
+    const altCompact = (imgs[0].getAttribute('alt') || '').replace(/\s/g, '');
     container.querySelectorAll('td, th, caption').forEach(cell => {
-      const txt = (cell.textContent || '').replace(/ /g, '').trim();
-      if (txt && txt !== imgs[0].getAttribute('alt')) captionText = txt;
+      const raw = (cell.textContent || '').trim();
+      const compact = raw.replace(/\s/g, '');
+      if (compact && compact !== altCompact) captionText = raw;
     });
 
     const imgClone = imgs[0].cloneNode(true);

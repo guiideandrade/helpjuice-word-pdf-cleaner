@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.0.1 — 2026-06-08
+
+### Fixed
+- Underline normalization no longer flattens nested markup — `<u><a>link</a></u>` keeps its link instead of being reduced to plain text
+- `<figcaption>` from single-image tables keeps original spacing (was stripping `&nbsp;` characters from the caption text)
+- Double-`<br>` paragraph breaks are no longer silently deleted by the list pass (which merged adjacent lines); they are surfaced by the `double-br-as-paragraph` validator with a one-click `br-to-p` fix
+- Security: `data:image/svg+xml` URIs are now stripped from `href`/`src` (SVG can carry inline `<script>`/event handlers)
+
 ## v2.0.0 — 2026-06-08
 
 Complete rewrite. Ground-up transform + validate + report pipeline.
