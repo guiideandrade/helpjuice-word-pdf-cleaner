@@ -1,5 +1,17 @@
 # Changelog
 
+## v2.1.1 — 2026-06-08
+
+### Added
+- GitHub Actions workflow (`.github/workflows/deploy.yml`): runs tests + build on every PR; builds and deploys `dist/` to GitHub Pages on push to `main`.
+- Test asserting `fixLinks` adds `rel="noopener noreferrer"` to every external link.
+
+### Removed
+- Dead `link-external-no-rel` validator and its `add-rel` autofix — `fixLinks` already adds `rel` to every external link in-pipeline, so the rule could never fire (17 validation rules now).
+
+### Changed
+- `getOrderedLevel`: documented the deliberate lone-`i.`/`v.`/`x.` → alpha-level-2 choice (multi-char romans still route to level 3).
+
 ## v2.1.0 — 2026-06-08
 
 Resolves the five HANDOFF scope questions.

@@ -38,6 +38,15 @@ describe('defect regressions', () => {
   });
 });
 
+describe('link hygiene', () => {
+  it('fixLinks adds rel="noopener noreferrer" to every external link (no missing-rel finding possible)', () => {
+    const { html, findings } = runPipeline('<p><a href="https://example.com">x</a></p>');
+    expect(html).toContain('rel="noopener noreferrer"');
+    // the redundant link-external-no-rel validator was removed; nothing should report it
+    expect(findings.some(f => f.rule === 'link-external-no-rel')).toBe(false);
+  });
+});
+
 describe('Q4 — strip fixed dimensions', () => {
   it('img-fixed-dimensions is autofixable and removes width/height', () => {
     const { findings, doc } = runPipeline(

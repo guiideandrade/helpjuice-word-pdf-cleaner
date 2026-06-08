@@ -210,6 +210,11 @@ function getBulletLevel(text) {
 function getOrderedLevel(text) {
   const t = text.trim();
   if (/^\d+\./.test(t)) return { level: 1, type: '1' };
+  // Single-letter markers (a., b., … and the lone i./v./x.) are read as alpha
+  // level-2. This is deliberate: a lone "i." is ambiguous (9th alpha item vs.
+  // roman 1) and Word's default scheme reaches level-2 alpha far more often than
+  // a one-item roman sub-list. Multi-character romans (ii., iv., vii., …) don't
+  // match this branch and fall through to the level-3 roman branch below.
   if (/^[a-z]\./.test(t)) return { level: 2, type: 'a' };
   if (/^(i{1,3}|iv|v|vi{1,3}|ix|x)\./i.test(t)) return { level: 3, type: 'i' };
   return null;

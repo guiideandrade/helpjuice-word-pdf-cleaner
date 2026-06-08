@@ -128,25 +128,9 @@ function headingH1InBody(doc) {
   };
 }
 
-function linkExternalNoRel(doc) {
-  const bad = Array.from(doc.querySelectorAll('a[href]')).filter(a => {
-    const href = a.getAttribute('href') || '';
-    const isExt = href.startsWith('http://') || href.startsWith('https://') || href.startsWith('//');
-    if (!isExt) return false;
-    const rel = (a.getAttribute('rel') || '').split(/\s+/);
-    return !rel.includes('noopener') || !rel.includes('noreferrer');
-  });
-  if (!bad.length) return null;
-  return {
-    rule: 'link-external-no-rel',
-    severity: 'high',
-    category: 'security',
-    message: `${bad.length} external link(s) missing rel="noopener noreferrer"`,
-    nodes: bad,
-    autofixable: true,
-    autofix: 'add-rel',
-  };
-}
+// (Removed link-external-no-rel validator: the fixLinks transform unconditionally
+// adds rel="noopener noreferrer" to every external link in-pipeline, so this rule
+// could never fire. The fixLinks guarantee is covered by a test instead.)
 
 function linkJsOrDataHref(doc) {
   const bad = Array.from(doc.querySelectorAll('a[href]')).filter(a => {
@@ -317,12 +301,6 @@ export const AUTOFIXES = {
     h2.innerHTML = n.innerHTML;
     n.replaceWith(h2);
   }),
-  'add-rel': (nodes) => nodes.forEach(a => {
-    const rel = (a.getAttribute('rel') || '').split(/\s+/).filter(Boolean);
-    if (!rel.includes('noopener')) rel.push('noopener');
-    if (!rel.includes('noreferrer')) rel.push('noreferrer');
-    a.setAttribute('rel', rel.join(' '));
-  }),
   'strip-href':         (nodes) => nodes.forEach(a => a.removeAttribute('href')),
   // Q4: remove Word's fixed pixel dimensions so images scale fluidly to the KB's CSS.
   'strip-dimensions':   (nodes) => nodes.forEach(n => { n.removeAttribute('width'); n.removeAttribute('height'); }),
@@ -370,7 +348,6 @@ const RULES = [
   headingSkippedLevel,
   headingEmpty,
   headingH1InBody,
-  linkExternalNoRel,
   linkJsOrDataHref,
   linkEmptyHref,
   linkPoorAnchorText,
