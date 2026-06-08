@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Helpjuice Word Cleaner Pro v3.0</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:#1e1e29; color:#fff; margin:0; padding:0; }
+.container { max-width:1200px; margin:30px auto; background:#23233a; border-radius:12px; box-shadow:0 5px 30px #0005; padding:30px; }
+.header h1 { color:#4f9cff; margin:0; font-size:1.9rem; }
+.header p { color:#bbb; margin-bottom:24px; font-size:1rem; }
+.grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:22px; }
+textarea { width:100%; min-height:320px; background:#131321; border-radius:7px; border:2px solid #324377; color:#e6ebfa; padding:12px; font-family:'Consolas',monospace; font-size:13px; resize:vertical; line-height:1.5; }
+textarea.raw { background:#0b0b18; border-color:#4a5568; color:#cbd5e0; }
+.response-label { color:#7ba5fa; font-size:13px; margin-bottom:6px; font-weight:600; display:flex; justify-content:space-between; align-items:center; }
+.badge { background:#7c3aed; color:#fff; padding:3px 9px; border-radius:12px; font-size:11px; font-weight:600; }
+.btn { border:none; border-radius:7px; padding:8px 20px; color:#fff; background:#4f9cff; font-weight:600; font-size:14px; cursor:pointer; margin-right:8px; margin-top:8px; transition:background 0.2s; }
+.btn.success { background:#10b981; }
+.btn.secondary { background:#6b7280; }
+.btn:hover { background:#3474d1; }
+.btn.success:hover { background:#0c8e63; }
+.btn.secondary:hover { background:#4b5563; }
+.alert { padding:10px 12px; border-radius:8px; margin-bottom:16px; color:#fff; font-weight:500; font-size:13px; }
+.alert.success { background:#10b981; }
+.alert.error { background:#ef4444; }
+.alert.info { background:#3b82f6; }
+.hidden { display:none; }
+.footer { text-align:center; padding:14px 10px 4px; margin-top:18px; color:#7ba5fa; font-size:12px; border-top:2px solid #324377; }
+@media (max-width:900px){ .grid-2{grid-template-columns:1fr;} .container{padding:20px;} }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>🧹 Helpjuice Word Cleaner Pro</h1>
+    <p>Main list + sub-items from Word/PDF bullets (·, o, §, ■), OL numbered lists, headings without links, underline safety, image-table unwrap and complete HTML cleanup.</p>
+  </div>
+  <div class="grid-2">
+    <div>
+      <div class="response-label">
+        <span>📥 RAW HTML Input</span>
+        <span class="badge">WORD / PDF</span>
+      </div>
+      <textarea id="raw-html" class="raw" placeholder="Paste HTML from Word/PDF..."></textarea>
+      <button class="btn success" onclick="copyOutput(event,'raw-html')">📋 Copy Raw</button>
+      <button class="btn secondary" onclick="clearAll()">🗑️ Clear</button>
+    </div>
+    <div>
+      <div class="response-label">
+        <span>✨ Cleaned HTML</span>
+        <span class="badge">HELPJUICE</span>
+      </div>
+      <textarea id="output-html" readonly placeholder="Cleaned HTML will appear here..."></textarea>
+      <button class="btn success" onclick="copyOutput(event,'output-html')">📋 Copy Clean</button>
+    </div>
+  </div>
+  <div id="alert" class="alert hidden"></div>
+  <div class="footer">
+    v3.0 – Main list (·) + sub-items (o) + OL + headings without &lt;a&gt; + underline + image table unwrap
+    <br>Created by Kenan Sehovic
+  </div>
+</div>
+<script>
+let statsData = { listsCreated: 0 };
+
+function copyOutput(e, targetId){
+  const ta = document.getElementById(targetId);
+  if(!ta.value){ showAlert('No content to copy!','error'); return; }
+  if(navigator.clipboard && window.isSecureContext){
+    navigator.clipboard.writeText(ta.value).then(
+      ()=>btnNotify(e.target,'Copied!'),
+      ()=>fallback(ta)
+    );
+  }else{
+    fallback(ta);
+  }
+  function fallback(textarea){
+    const hadRO = textarea.hasAttribute('readonly');
+    if(hadRO) textarea.removeAttribute('readonly');
+    textarea.select();
+    document.execCommand('copy');
+    if(hadRO) textarea.setAttribute('readonly','');
+    btnNotify(e.target,'Copied!');
+  }
+}
+
+function btnNotify(btn, txt){
+  const org = btn.innerHTML;
+  btn.innerHTML = '✓ '+txt;
+  setTimeout(()=>{ btn.innerHTML = org; }, 1500);
+}
+
+function showAlert(msg, type='info'){
+  const a = document.getElementById('alert');
+  a.textContent = msg;
+  a.className = 'alert';
+  if(type==='success') a.classList.add('success');
+  else if(type==='error') a.classList.add('error');
+  else a.classList.add('info');
+  a.classList.remove('hidden');
+  setTimeout(()=>hideAlert(), 3500);
+}
+
+function hideAlert(){ document.getElementById('alert').classList.add('hidden'); }
+
+function clearAll(){
+  document.getElementById('raw-html').value = '';
+  document.getElementById('output-html').value = '';
+  hideAlert();
+  statsData = { listsCreated: 0 };
+}
+
+/* H1–H6: remove <a>, keep text */
+function cleanHeadingLinks(doc){
+  doc.querySelectorAll('h1,h2,h3,h4,h5,h6').forEach(h=>{
+    const links = Array.from(h.querySelectorAll('a'));
+    links.forEach(a=>{
+      const parent = a.parentNode;
+      if(!parent) return;
+      while(a.firstChild){ parent.insertBefore(a.firstChild, a); }
+      a.remove();
+    });
+  });
+}
+
+/* Underline safety – merge adjacent <u> elements */
+function normalizeUnderlineRuns(doc){
+  doc.querySelectorAll('u').forEach(u=>{
+    let text = u.textContent || '';
+    let next = u.nextSibling;
+    while(next && next.nodeType === 1 && next.tagName === 'U'){
+      text += next.textContent || '';
+      const rm = next;
+      next = next.nextSibling;
+      rm.remove();
+    }
+    u.textContent = text;
+  });
+}
+
+/* BULLET levels (· / o / § / ■) */
+function getBulletLevel(text){
+  const t = text.trim();
+  if(/^[•●○■▪▫◦‣⁃∙·]/.test(t)) return 1;
+  if(/^o\b/.test(t)) return 2;
+  if(/^[§■]/.test(t)) return 3;
+  return 0;
+}
+
+function stripBulletFromHTML(html){
+  let s = html.trim();
+  s = s.replace(/^(&middot;|\u00B7)\s*/i,'');
+  s = s.replace(/^[•●○■▪▫◦‣⁃∙·]\s*/, '');
+  s = s.replace(/^o\b\s*/, '');
+  s = s.replace(/^[§■]\s*/, '');
+  return s.trim();
+}
+
+/* ORDERED levels (1. / a. / i.) */
+function getOrderedLevel(text){
+  const t = text.trim();
+  if(/^\d+\./.test(t)) return { level:1, type:'1' };
+  if(/^[a-z]\./.test(t)) return { level:2, type:'a' };
+  if(/^(i|ii|iii|iv|v|vi|vii|viii|ix|x)\./i.test(t)) return { level:3, type:'i' };
+  return null;
+}
+
+/* Combined UL/OL conversion */
+function convertToLists(doc){
+  const blocks = Array.from(doc.body.querySelectorAll('p, div'));
+  let currentRootList = null;
+  let currentRootIsOrdered = false;
+  let currentRootType = null;
+  let lastLiPerLevel = { 1:null, 2:null, 3:null };
+  let lastLevel = 0;
+  let listsCreated = 0;
+
+  function resetListContext(){
+    currentRootList = null;
+    currentRootIsOrdered = false;
+    currentRootType = null;
+    lastLiPerLevel = { 1:null, 2:null, 3:null };
+    lastLevel = 0;
+  }
+
+  for(let i=0; i<blocks.length; i++){
+    const elem = blocks[i];
+    if(!elem.parentNode) continue;
+    const rawHTML = elem.innerHTML || '';
+    const text = (elem.textContent || '').trim();
+    if(!text) continue;
+    const bulletLevel = getBulletLevel(text);
+    const orderedInfo = bulletLevel === 0 ? getOrderedLevel(text) : null;
+    if(!bulletLevel && !orderedInfo){ resetListContext(); continue; }
+    const level = bulletLevel || (orderedInfo ? orderedInfo.level : 0);
+    const isOrdered = !!orderedInfo;
+    const orderedType = orderedInfo ? orderedInfo.type : null;
+    const parent = elem.parentNode;
+
+    if(!currentRootList || (isOrdered !== currentRootIsOrdered)){
+      const list = document.createElement(isOrdered ? 'ol' : 'ul');
+      if(isOrdered && orderedType){
+        list.setAttribute('type', orderedType);
+      }else if(!isOrdered){
+        list.style.listStyleType = 'disc';
+      }
+      parent.insertBefore(list, elem);
+      currentRootList = list;
+      currentRootIsOrdered = isOrdered;
+      currentRootType = orderedType;
+      lastLiPerLevel = { 1:null, 2:null, 3:null };
+      lastLevel = 0;
+      listsCreated++;
+    }
+
+    if(level < lastLevel){
+      for(let l = level+1; l<=3; l++){ lastLiPerLevel[l] = null; }
+    }
+    lastLevel = level;
+
+    let targetParent;
+    if(level === 1){
+      targetParent = currentRootList;
+    }else{
+      const parentLi = lastLiPerLevel[level-1] || lastLiPerLevel[1];
+      if(!parentLi){
+        targetParent = currentRootList;
+      }else{
+        let nestedList = parentLi.querySelector(':scope > ul, :scope > ol');
+        if(!nestedList){
+          nestedList = document.createElement(isOrdered ? 'ol' : 'ul');
+          if(isOrdered && orderedType){
+            nestedList.setAttribute('type', orderedType);
+          }else if(!isOrdered){
+            nestedList.style.listStyleType = 'disc';
+          }
+          parentLi.appendChild(nestedList);
+        }
+        targetParent = nestedList;
+      }
+    }
+
+    const li = document.createElement('li');
+    let contentHTML = rawHTML.trim();
+    if(bulletLevel){
+      contentHTML = stripBulletFromHTML(contentHTML);
+    }else if(orderedInfo){
+      contentHTML = contentHTML.replace(/^(\d+\.|[a-z]\.|(i|ii|iii|iv|v|vi|vii|viii|ix|x)\.)\s*/i,'');
+    }
+    li.innerHTML = contentHTML;
+    targetParent.appendChild(li);
+    lastLiPerLevel[level] = li;
+    elem.remove();
+  }
+  statsData.listsCreated = listsCreated;
+}
+
+/* Word namespace tags */
+function removeWordNamespaceTags(doc){
+  const all = Array.from(doc.body.getElementsByTagName('*'));
+  all.forEach(el=>{
+    const tag = el.tagName.toLowerCase();
+    if(tag.includes(':')){
+      if(tag.startsWith('o:') || tag.startsWith('w:') || tag.startsWith('v:') || tag.startsWith('m:')){
+        el.remove();
+      }
+    }
+  });
+}
+
+/* Unwrap spans */
+function unwrapAllSpans(doc){
+  let iterations = 0;
+  const maxIterations = 5;
+  while(iterations < maxIterations){
+    const spans = doc.querySelectorAll('span');
+    if(spans.length === 0) break;
+    spans.forEach(span=>{
+      const parent = span.parentNode;
+      if(!parent) return;
+      while(span.firstChild){ parent.insertBefore(span.firstChild, span); }
+      span.remove();
+    });
+    iterations++;
+  }
+  const normalize = node=>{
+    if(node.nodeType === 1){
+      node.normalize();
+      Array.from(node.childNodes).forEach(normalize);
+    }
+  };
+  normalize(doc.body);
+}
+
+/* Remove empty p/div */
+function removeAllEmptyElements(doc){
+  let removed = true;
+  let iterations = 0;
+  const maxIterations = 8;
+  while(removed && iterations < maxIterations){
+    removed = false;
+    iterations++;
+    doc.querySelectorAll('p').forEach(p=>{
+      const textOnly = (p.textContent || '').replace(/\s+/g,'').trim();
+      const hasBlock = p.querySelector('img,iframe,video,table,ul,ol,figure');
+      if(!textOnly && !hasBlock){ p.remove(); removed = true; }
+    });
+    doc.querySelectorAll('div').forEach(div=>{
+      const textOnly = (div.textContent || '').replace(/\s+/g,'').trim();
+      const hasBlock = div.querySelector('img,iframe,video,table,ul,ol,figure,h1,h2,h3,h4,h5,h6');
+      if(!textOnly && !hasBlock){ div.remove(); removed = true; }
+    });
+  }
+}
+
+/* Image-only tables → unwrap to <img> */
+function unwrapSingleImageTables(doc){
+  const candidates = [];
+  doc.querySelectorAll('table').forEach(tbl => candidates.push(tbl));
+  doc.querySelectorAll('figure.table').forEach(fig => candidates.push(fig));
+  candidates.forEach(container => {
+    if(!container.parentNode) return;
+    const imgs = container.querySelectorAll('img');
+    if(imgs.length !== 1) return;
+    let hasText = false;
+    container.querySelectorAll('td,th').forEach(cell => {
+      const txt = (cell.textContent || '')
+        .replace(/&nbsp;/gi,'')
+        .replace(/\s+/g,'')
+        .trim();
+      if(txt) hasText = true;
+    });
+    if(hasText) return;
+    const imgClone = imgs[0].cloneNode(true);
+    container.parentNode.replaceChild(imgClone, container);
+  });
+}
+
+/* Add border-style:solid to all tables and td elements */
+function applyTableBorders(doc){
+  doc.querySelectorAll('table').forEach(tbl => {
+    tbl.style.borderStyle = 'solid';
+  });
+  doc.querySelectorAll('td').forEach(td => {
+    td.style.borderStyle = 'solid';
+  });
+}
+
+/* NEW RULE: Unwrap Word WordSection divs (page:WordSectionX) */
+function unwrapWordSectionDivs(doc){
+  doc.querySelectorAll('div').forEach(div => {
+    const styleAttr = (div.getAttribute('style') || '').replace(/\s/g,'').toLowerCase();
+    if(styleAttr.includes('page:') && styleAttr.match(/page:\s*wordsection/i)){
+      const parent = div.parentNode;
+      if(!parent) return;
+      while(div.firstChild){
+        parent.insertBefore(div.firstChild, div);
+      }
+      div.remove();
+    }
+  });
+}
+
+/* Strip cosmetic inline styles, keep only border-style and list-style-type */
+const COSMETIC_STYLE_PROPS = [
+  'font-family','font-size','font-weight','font-style','font-variant',
+  'color','background','background-color','background-image',
+  'line-height','letter-spacing','word-spacing','text-transform',
+  'text-shadow','text-indent','text-align',
+  'margin','margin-top','margin-right','margin-bottom','margin-left',
+  'padding','padding-top','padding-right','padding-bottom','padding-left',
+  'width','height','min-width','max-width','min-height','max-height',
+  'vertical-align','float','display','overflow','visibility','opacity',
+  'white-space','word-break','word-wrap','page-break-after','page-break-before',
+  'mso-line-height-rule','mso-pagination','mso-margin-top-alt',
+  'mso-outline-level','tab-stops','list-style','page'
+];
+
+function cleanInlineStyles(doc){
+  doc.querySelectorAll('[style]').forEach(el => {
+    const tag = el.tagName.toLowerCase();
+    if(tag === 'table' || tag === 'td'){
+      const borderVal = el.style.borderStyle;
+      el.removeAttribute('style');
+      if(borderVal){ el.style.borderStyle = borderVal; }
+      return;
+    }
+    if(tag === 'ul' || tag === 'ol'){
+      const lstVal = el.style.listStyleType;
+      el.removeAttribute('style');
+      if(lstVal){ el.style.listStyleType = lstVal; }
+      return;
+    }
+    COSMETIC_STYLE_PROPS.forEach(prop => {
+      el.style.removeProperty(prop);
+    });
+    if(!el.getAttribute('style') || el.getAttribute('style').trim() === ''){
+      el.removeAttribute('style');
+    }
+  });
+}
+
+function cleanHTML(){
+  try{
+    const html = document.getElementById('raw-html').value;
+    if(!html.trim()){
+      showAlert('No HTML code to clean!','error');
+      return;
+    }
+    hideAlert();
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html,'text/html');
+    removeWordNamespaceTags(doc);
+    unwrapWordSectionDivs(doc);
+    unwrapAllSpans(doc);
+    normalizeUnderlineRuns(doc);
+    cleanHeadingLinks(doc);
+    convertToLists(doc);
+    unwrapSingleImageTables(doc);
+    applyTableBorders(doc);
+    doc.querySelectorAll('style,script').forEach(x=>x.remove());
+    const removeComments = n=>{
+      for(let i=n.childNodes.length-1;i>=0;i--){
+        const c = n.childNodes[i];
+        if(c.nodeType === 8) n.removeChild(c);
+        else if(c.nodeType === 1) removeComments(c);
+      }
+    };
+    removeComments(doc.body);
+    (function cleanAttributes(node){
+      if(node.nodeType !== 1) return;
+      const ok = ['href','src','alt','title','start','width','height','style'];
+      Array.from(node.attributes).forEach(attr=>{
+        if(!ok.includes(attr.name)) node.removeAttribute(attr.name);
+      });
+      Array.from(node.childNodes).forEach(cleanAttributes);
+    })(doc.body);
+    cleanInlineStyles(doc);
+    removeAllEmptyElements(doc);
+    let output = doc.body.innerHTML;
+    output = output.replace(/&nbsp;/g,' ');
+    output = output.replace(/<p>\s*<\/p>/gi,'');
+    output = output.replace(/<div>\s*<\/div>/gi,'');
+    output = output.replace(/\s+/g,' ');
+    output = output.trim();
+    document.getElementById('output-html').value = output;
+    let msg = '✅ HTML cleaned successfully.';
+    if(statsData.listsCreated > 0){ msg += ' '+statsData.listsCreated+' list(s) created.'; }
+    showAlert(msg,'success');
+  }catch(err){
+    console.error('Error in cleanHTML:', err);
+    showAlert('❌ Error: '+err.message,'error');
+  }
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  const rawArea = document.getElementById('raw-html');
+  rawArea.addEventListener('paste',e=>{
+    e.preventDefault();
+    hideAlert();
+    try{
+      const cd = e.clipboardData || window.clipboardData;
+      const htmlData = cd.getData('text/html');
+      const textData = cd.getData('text/plain');
+      const full = htmlData && htmlData.trim() ? htmlData : textData;
+      if(full){
+        rawArea.value = full;
+        setTimeout(()=>{ cleanHTML(); }, 120);
+      }
+    }catch(err){
+      console.error('Paste error:', err);
+      showAlert('Paste operation error.','error');
+    }
+  });
+});
+</script>
+</body>
+</html>
