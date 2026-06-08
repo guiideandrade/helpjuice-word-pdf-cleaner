@@ -19,9 +19,17 @@ Paste Word/PDF HTML into the left pane. The tool auto-cleans on paste and render
 
 `npm run build` produces a single self-contained `dist/index.html` (all JS/CSS inlined via `vite-plugin-singlefile`). It works from any static host **and** from a plain `file://` URL.
 
-**Deployment is automated.** `.github/workflows/deploy.yml` runs the test suite and build on every PR, and on every push to `main` it builds and publishes `dist/` to **GitHub Pages**. One-time setup: in the repo settings, set **Pages → Build and deployment → Source** to **GitHub Actions**.
+### Deploy to GitHub Pages (manual)
 
-To host elsewhere, just serve the built `dist/index.html` from any static server.
+```sh
+npm run deploy
+```
+
+This builds and force-pushes `dist/` to the **`gh-pages`** branch (via `gh-pages`, run through `npx` — no permanent dependency). The empty `public/.nojekyll` is copied into the build so Pages serves the files as-is.
+
+One-time setup: in the repo settings, set **Pages → Build and deployment → Source** to **Deploy from a branch → `gh-pages` / `/ (root)`**.
+
+> Deploy is intentionally manual (no GitHub Actions). Run `npm run deploy` after merging changes to `main`. To host elsewhere, serve the built `dist/index.html` from any static server.
 
 ## Architecture
 

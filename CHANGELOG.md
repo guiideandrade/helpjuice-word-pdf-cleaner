@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.1.2 — 2026-06-08
+
+### Changed
+- Deployment is now manual instead of GitHub Actions. Removed `.github/workflows/deploy.yml` (the account's Actions are billing-locked); added an `npm run deploy` script that builds and pushes `dist/` to the `gh-pages` branch via `npx gh-pages`. Pages source = `gh-pages` branch.
+- Added `public/.nojekyll` so Pages serves the build as-is.
+
 ## v2.1.1 — 2026-06-08
 
 ### Added

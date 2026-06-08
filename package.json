@@ -1,6 +1,6 @@
 {
   "name": "helpjuice-word-pdf-cleaner",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "private": true,
   "type": "module",
   "description": "Client-side Word/PDF HTML cleaner for Helpjuice — transform + validate + report pipeline.",
@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "deploy": "npm run build && npx --yes gh-pages@6 -d dist --dotfiles -m \"chore: deploy $(node -p \"require('./package.json').version\")\""
   },
   "dependencies": {
     "dompurify": "^3.2.4"
