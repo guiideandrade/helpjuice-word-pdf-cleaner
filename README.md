@@ -44,7 +44,6 @@ src/
 ├── attr-policy.js    Per-element attribute allow-list + URL scheme validator
 └── sanitize.js       DOMPurify final safety net (HTML-only profile)
 tests/                Vitest fixtures (regression + Q4/Q5 + sanitizer)
-v1/                   Original single-file tool by Kenan Sehovic, kept for reference
 ```
 
 ### Pipeline order
