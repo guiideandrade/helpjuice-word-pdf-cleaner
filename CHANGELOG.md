@@ -71,7 +71,6 @@ Complete rewrite. Ground-up transform + validate + report pipeline.
 - Fixed-dimension image validator (Word pixel values may not match KB layout)
 - `javascript:`/`vbscript:`/unsafe-`data:` stripped from `href`/`src`
 - `on*` event handlers explicitly removed
-- `v1/` subfolder preserves original tool by Kenan Sehovic for reference
 
 ### Changed
 - Attribute policy: `style` no longer globally allowed; structural properties kept via dedicated scrub pass
@@ -85,4 +84,4 @@ Complete rewrite. Ground-up transform + validate + report pipeline.
 
 ## v1 (word-pdf-cleaner-v5-1) — pre-2026-06-01
 
-Original single-file tool by Kenan Sehovic. See `v1/index.html` and `AUDIT.md` for full issue inventory.
+Original single-file tool by Kenan Sehovic (removed from the tree on 2026-06-15; recoverable via git history). See `AUDIT.md` for the full issue inventory that drove the v2 rewrite.
