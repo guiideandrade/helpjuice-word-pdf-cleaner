@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.2.0 — 2026-06-16
+
+### Changed
+- **List nesting now reads Word's `mso-list` level** (`convertLists`). Level comes from the paragraph's `mso-list:lN levelM` inline style (authoritative; survives to pass 8), while ordered-vs-unordered still comes from the marker glyph. This fixes sub-bullets that the glyph-only heuristic missed (e.g. Word's level-2 `o ` marker) without reintroducing the Portuguese-`o` false-positive: a paragraph with no `mso-list` marker is never treated as a bullet on the strength of a leading `o`. Plain glyph bullets (PDF paste, no `mso-list`) still convert via the fallback path.
+- **Marker stripping consumes Word's trailing spacing** — `stripBulletPrefix`/new `stripOrderedPrefix` now strip the `&nbsp;`/entity run Word leaves after a marker, so `·&nbsp;&nbsp; Text` becomes `Text`.
+
 ## v2.1.2 — 2026-06-08
 
 ### Changed
