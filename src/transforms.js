@@ -201,10 +201,30 @@ export function cleanHeadings(doc) {
 function getBulletLevel(text) {
   const t = text.trim();
   if (/^[•●○■▪▫◦‣⁃∙·]/.test(t)) return 1;
-  // Only treat 'o' as sub-bullet if it comes from mso-list context or followed by space
+  // The 'o' marker is Word's level-2 bullet but also a common word ("o gato" in
+  // Portuguese). Glyph-detection alone can't tell them apart, so here — the
+  // no-mso-list fallback path — we stay conservative and reject "o" + a letter.
+  // The authoritative level-2 case is handled by getMsoListLevel() in convertLists.
   if (/^o\s/.test(t) && !/^[a-zA-Z]/.test(t.slice(2))) return 2;
   if (/^[§■]/.test(t)) return 3;
   return 0;
+}
+
+// Word's authoritative nesting level. Word emits list paragraphs as
+// `<p style='...mso-list:l0 level2 lfo1'>`; this inline style survives to pass 8
+// (scrubStyles runs at pass 12). The `@list` CSS that maps a list to ordered vs.
+// unordered lives in the <style> block that pass 2 already stripped, so we read
+// the *level* here and still derive *type* from the leading marker glyph.
+//
+//   mso-list:l0 level2 lfo1
+//                  ^^^^^^ → 2
+function getMsoListLevel(elem) {
+  const style = elem.getAttribute && elem.getAttribute('style');
+  if (!style) return 0;
+  const m = /mso-list:\s*l\d+\s+level(\d+)/i.exec(style);
+  if (!m) return 0;
+  const lvl = parseInt(m[1], 10);
+  return lvl >= 1 && lvl <= 3 ? lvl : (lvl > 3 ? 3 : 0);
 }
 
 function getOrderedLevel(text) {
@@ -220,12 +240,25 @@ function getOrderedLevel(text) {
   return null;
 }
 
+// Leading Word spacing left after a marker is unwrapped: `&nbsp;`, `&#160;`,
+// numeric/hex entities, or literal whitespace. Stripped after the glyph so
+// `·&nbsp;&nbsp; Text` becomes `Text`, not `&nbsp;&nbsp; Text`.
+const WORD_SPACING = /^(?:&nbsp;|&#0*160;|&#x0*a0;|\s)+/i;
+
 function stripBulletPrefix(html) {
   return html.trim()
-    .replace(/^(&middot;|·)\s*/i, '')
-    .replace(/^[•●○■▪▫◦‣⁃∙·]\s*/, '')
-    .replace(/^o\s+/, '')
-    .replace(/^[§■]\s*/, '')
+    .replace(/^(&middot;|·)/i, '')
+    .replace(/^[•●○■▪▫◦‣⁃∙·]/, '')
+    .replace(/^o(?=&nbsp;|\s)/i, '')
+    .replace(/^[§■]/, '')
+    .replace(WORD_SPACING, '')
+    .trim();
+}
+
+function stripOrderedPrefix(html) {
+  return html.trim()
+    .replace(/^(\d+\.|[a-z]\.|(i{1,3}|iv|v|vi{1,3}|ix|x)\.)/i, '')
+    .replace(WORD_SPACING, '')
     .trim();
 }
 
@@ -249,13 +282,26 @@ export function convertLists(doc) {
     const text = (elem.textContent || '').trim();
     if (!text) { resetCtx(); continue; }
 
+    // Level comes from Word's mso-list marker when present (authoritative, and
+    // the only reliable signal for deep nesting); the marker glyph still decides
+    // ordered-vs-unordered. With no mso-list, fall back to pure glyph detection.
+    const msoLevel = getMsoListLevel(elem);
     const bulletLevel = getBulletLevel(text);
-    const orderedInfo = bulletLevel === 0 ? getOrderedLevel(text) : null;
-    if (!bulletLevel && !orderedInfo) { resetCtx(); continue; }
+    const orderedInfo = getOrderedLevel(text);
 
-    const level = bulletLevel || orderedInfo.level;
-    const isOrdered = !!orderedInfo;
-    const orderedType = orderedInfo?.type;
+    let level, isOrdered, orderedType;
+    if (msoLevel) {
+      level = msoLevel;
+      isOrdered = !bulletLevel && !!orderedInfo;
+      orderedType = isOrdered ? orderedInfo.type : undefined;
+    } else if (bulletLevel || orderedInfo) {
+      level = bulletLevel || orderedInfo.level;
+      isOrdered = !bulletLevel && !!orderedInfo;
+      orderedType = isOrdered ? orderedInfo.type : undefined;
+    } else {
+      resetCtx();
+      continue;
+    }
     const parent = elem.parentNode;
 
     if (!currentRootList || isOrdered !== currentRootIsOrdered) {
@@ -294,11 +340,7 @@ export function convertLists(doc) {
 
     const li = doc.createElement('li');
     let contentHTML = elem.innerHTML.trim();
-    if (bulletLevel) {
-      contentHTML = stripBulletPrefix(contentHTML);
-    } else if (orderedInfo) {
-      contentHTML = contentHTML.replace(/^(\d+\.|[a-z]\.|(i{1,3}|iv|v|vi{1,3}|ix|x)\.)\s*/i, '');
-    }
+    contentHTML = isOrdered ? stripOrderedPrefix(contentHTML) : stripBulletPrefix(contentHTML);
     li.innerHTML = contentHTML;
     targetParent.appendChild(li);
     lastLiPerLevel[level] = li;

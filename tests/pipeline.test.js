@@ -115,3 +115,51 @@ describe('Q2 — DOMPurify final safety net', () => {
     expect(html).not.toContain('onclick');
   });
 });
+
+describe('list/sublist recognition (mso-list level + glyph fallback)', () => {
+  // Word emits list paragraphs with the nesting level in the inline style
+  // (mso-list:lN levelM) and the marker glyph inside a <span style='mso-list:Ignore'>
+  // that pass 5 unwraps, leaving "·&nbsp;&nbsp; Text".
+  const w = (level, marker, text) =>
+    `<p style="mso-list:l0 level${level} lfo1">` +
+    `<span style="mso-list:Ignore">${marker}<span style="font:7pt 'Times New Roman'">&nbsp;&nbsp; </span></span>` +
+    `${text}</p>`;
+
+  it('nests a level-2 mso-list item inside the level-1 list', () => {
+    const raw = w(1, '·', 'Parent') + w(2, 'o', 'Child') + w(1, '·', 'Parent two');
+    const { html } = runPipeline(raw);
+    // one outer <ul> with a nested <ul> holding the child
+    expect(html).toMatch(/<ul>\s*<li>Parent\s*<ul>\s*<li>Child<\/li>\s*<\/ul>\s*<\/li>\s*<li>Parent two<\/li>\s*<\/ul>/);
+  });
+
+  it("strips the 'o' marker + Word spacing from a level-2 item", () => {
+    const { html } = runPipeline(w(1, '·', 'Top') + w(2, 'o', 'Sub item'));
+    expect(html).toContain('<li>Sub item</li>');
+    expect(html).not.toMatch(/<li>\s*o\s/);
+    expect(html).not.toContain('&nbsp;');
+  });
+
+  it("does NOT treat a Portuguese 'o ...' paragraph (no mso-list) as a bullet", () => {
+    const { html } = runPipeline('<p>o gato comeu o rato</p>');
+    expect(html).toContain('<p>o gato comeu o rato</p>');
+    expect(html).not.toContain('<ul>');
+  });
+
+  it('derives ordered vs unordered from the marker even with mso-list level', () => {
+    const raw = w(1, '1.', 'First') + w(2, 'a.', 'Sub a') + w(1, '2.', 'Second');
+    const { html } = runPipeline(raw);
+    expect(html).toMatch(/<ol[^>]*>\s*<li>First\s*<ol[^>]*type="a"[^>]*>\s*<li>Sub a<\/li>/);
+    expect(html).toContain('<li>Second</li>');
+  });
+
+  it('still converts plain glyph bullets with no mso-list (PDF paste fallback)', () => {
+    const { html } = runPipeline('<p>• One</p><p>• Two</p>');
+    expect(html).toMatch(/<ul>\s*<li>One<\/li>\s*<li>Two<\/li>\s*<\/ul>/);
+  });
+
+  it('handles three mso-list levels', () => {
+    const raw = w(1, '·', 'L1') + w(2, 'o', 'L2') + w(3, '§', 'L3');
+    const { html } = runPipeline(raw);
+    expect(html).toMatch(/<li>L1\s*<ul>\s*<li>L2\s*<ul>\s*<li>L3<\/li>/);
+  });
+});

@@ -1,6 +1,6 @@
 {
   "name": "helpjuice-word-pdf-cleaner",
-  "version": "2.1.2",
+  "version": "2.2.0",
   "private": true,
   "type": "module",
   "description": "Client-side Word/PDF HTML cleaner for Helpjuice — transform + validate + report pipeline.",
