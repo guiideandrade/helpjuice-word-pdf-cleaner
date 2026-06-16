@@ -7,9 +7,12 @@ export const ATTR_POLICY = {
   'ol':         ['type', 'start'],
   'ul':         [],
   'li':         [],
-  'th':         ['scope', 'colspan', 'rowspan', 'headers'],
-  'td':         ['colspan', 'rowspan', 'headers'],
-  'table':      ['border'],
+  // class + style allowed on table cells so the cleaner's own border/padding
+  // styling and hj-cleaned-* classes survive; scrubStyles (pass 12) then filters
+  // style down to a border/padding allow-list, so this is not an injection vector.
+  'th':         ['scope', 'colspan', 'rowspan', 'headers', 'class', 'style'],
+  'td':         ['colspan', 'rowspan', 'headers', 'class', 'style'],
+  'table':      ['border', 'class', 'style'],
   'blockquote': ['cite'],
   'figure':     [],
   'figcaption': [],

@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.3.0 — 2026-06-16
+
+### Added
+- **Automatic table borders** (`fixTables`). Every table + `thead` + every `th`/`td` now gets a 1px solid `#ccc` border, `border-collapse: collapse`, cell padding, and stable `hj-cleaned-table` / `hj-cleaned-cell` classes. Header cells (`th`) are bordered too (previously skipped).
+- **Froala / CKEditor target toggle** (UI). Table-border output is tuned per editor (Phase-0 round-trip findings): Froala (Legacy) keeps inline styles verbatim → emits the exact 1px `border-width`; CKEditor (Rich Text, default) strips inline `border-width` regardless of form, so it emits `border-style`+`border-color` and leans on the `hj-cleaned-*` classes for the exact width via theme CSS. Switching the toggle re-cleans. Default is CKEditor.
+
+### Fixed
+- **Borders now survive the pipeline.** `applyAttrPolicy` (pass 11) used to strip the `style` attribute before `scrubStyles` (pass 12) could preserve it, so `fixTables`' borders never reached the output. `style` + `class` are now allowed on `table`/`th`/`td`, and `scrubStyles` is the single gatekeeper — it keeps a strict border/padding/`border-collapse` allow-list and drops everything else (so allowing `style` is not a CSS-injection vector). Word's own table classes are replaced, not appended.
+
 ## v2.2.0 — 2026-06-16
 
 ### Changed

@@ -20,7 +20,10 @@ import { validate, detectBlockInInline } from './validators.js';
 import { sanitizeHtml } from './sanitize.js';
 
 // Returns { html, transforms, findings }
-export function runPipeline(rawHtml) {
+// `editor` selects the table-border output mode: 'froala' (exact inline 1px) or
+// 'ckeditor' (style+color inline + class for theme-driven width). Defaults to
+// 'ckeditor' (the current Helpjuice default editor).
+export function runPipeline(rawHtml, editor = 'ckeditor') {
   const parser = new DOMParser();
   const doc = parser.parseFromString(rawHtml, 'text/html');
 
@@ -35,7 +38,7 @@ export function runPipeline(rawHtml) {
     normalizeUnderlineRuns(doc),     // 6
     cleanHeadings(doc),              // 7
     convertLists(doc),               // 8
-    fixTables(doc),                  // 9
+    fixTables(doc, editor),          // 9
     fixImages(doc),                  // 10
     applyAttrPolicy(doc),            // 11
     scrubStyles(doc),                // 12

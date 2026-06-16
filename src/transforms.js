@@ -370,13 +370,36 @@ export function convertLists(doc) {
   };
 }
 
-// ─── Pass 9: Table accessibility ─────────────────────────────────────────────
-export function fixTables(doc) {
+// ─── Pass 9: Table accessibility + borders ───────────────────────────────────
+// Border output is tuned per target editor (Phase-0 editor matrix):
+//   Froala (Legacy)  — keeps inline styles verbatim → emit the full border incl.
+//                      width, so cells render an exact 1px rule with no theme help.
+//   CKEditor (default) — drops inline border-width (shorthand AND longhand) but
+//                      keeps border-style/-color, padding, and class. So we emit
+//                      style+color (no width) and lean on the hj-cleaned-* classes
+//                      for the exact 1px rule via theme CSS.
+// Both modes set border-collapse and stamp stable classes on table + cells.
+export const TABLE_CLASS = 'hj-cleaned-table';
+export const CELL_CLASS = 'hj-cleaned-cell';
+const BORDER_COLOR = '#cccccc';
+const CELL_PADDING = '8px';
+
+function applyBorder(el, editor) {
+  el.style.borderStyle = 'solid';
+  el.style.borderColor = BORDER_COLOR;
+  // CKEditor strips width regardless of how it's written, so only emit it for
+  // Froala (where it renders) — CKEditor's exact width comes from the class.
+  if (editor === 'froala') el.style.borderWidth = '1px';
+}
+
+export function fixTables(doc, editor = 'ckeditor') {
   let count = 0;
 
   doc.querySelectorAll('table').forEach(tbl => {
-    // Set border-style:solid (v1 behavior carried over)
-    tbl.style.borderStyle = 'solid';
+    // Replace (not add) the class so Word's own table classes don't survive.
+    tbl.className = TABLE_CLASS;
+    tbl.style.borderCollapse = 'collapse';
+    applyBorder(tbl, editor);
 
     // Promote first row of <td>s to <th scope="col"> when no <th> exists
     if (!tbl.querySelector('th')) {
@@ -402,11 +425,16 @@ export function fixTables(doc) {
       }
     }
 
-    // Add border to td elements
-    tbl.querySelectorAll('td').forEach(td => { td.style.borderStyle = 'solid'; });
+    // Borders + padding + class on every cell — th included (previously missed).
+    tbl.querySelectorAll('th, td').forEach(cell => {
+      cell.className = CELL_CLASS;
+      applyBorder(cell, editor);
+      cell.style.padding = CELL_PADDING;
+      count++;
+    });
   });
 
-  return { name: 'Table accessibility (thead promotion, border-style)', count };
+  return { name: `Table borders + thead promotion (${editor} mode)`, count };
 }
 
 // ─── Pass 10: Images ──────────────────────────────────────────────────────────
@@ -501,15 +529,32 @@ const COSMETIC_PROPS = [
   'mso-outline-level', 'tab-stops', 'list-style',
 ];
 
+// Table/cell styling the cleaner is allowed to keep. This is a strict allow-list
+// (not a cosmetic-deny-list) so that allowing `style` on table/th/td in the attr
+// policy can never become a CSS-injection vector — only border/padding/collapse
+// props survive; position, url(), etc. are dropped.
+const TABLE_STYLE_KEEP = [
+  'border', 'border-width', 'border-style', 'border-color',
+  'border-top', 'border-right', 'border-bottom', 'border-left',
+  'border-collapse', 'border-spacing',
+  'padding', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
+];
+
 export function scrubStyles(doc) {
   let count = 0;
   doc.querySelectorAll('[style]').forEach(el => {
     const tag = el.tagName.toLowerCase();
 
-    if (tag === 'table' || tag === 'td') {
-      const border = el.style.borderStyle;
+    if (tag === 'table' || tag === 'th' || tag === 'td') {
+      // Keep only whitelisted border/padding props; drop everything else.
+      const keep = [];
+      TABLE_STYLE_KEEP.forEach(p => {
+        const v = el.style.getPropertyValue(p);
+        if (v) keep.push([p, v]);
+      });
       el.removeAttribute('style');
-      if (border) el.style.borderStyle = border;
+      keep.forEach(([p, v]) => el.style.setProperty(p, v));
+      if (!el.getAttribute('style')?.trim()) el.removeAttribute('style');
       count++;
       return;
     }
@@ -525,7 +570,7 @@ export function scrubStyles(doc) {
     COSMETIC_PROPS.forEach(prop => el.style.removeProperty(prop));
     if (!el.getAttribute('style')?.trim()) { el.removeAttribute('style'); count++; }
   });
-  return { name: 'Style scrub (keep border-style, list-style-type)', count };
+  return { name: 'Style scrub (keep table border/padding, list-style-type)', count };
 }
 
 // ─── Pass 13: Remove empty elements ──────────────────────────────────────────
