@@ -37,6 +37,13 @@ textarea.raw { background: #0b0b18; border-color: #4a5568; color: #cbd5e0; }
 }
 .badge { background: #7c3aed; color: #fff; padding: 3px 9px; border-radius: 12px; font-size: 11px; font-weight: 600; }
 
+/* ── Editor toggle ── */
+.editor-toggle { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; margin-bottom: 18px; padding: 10px 14px; background: #f5f7ff; border: 1px solid #d7def5; border-radius: 8px; font-size: 13px; }
+.editor-toggle-label { font-weight: 600; color: #324377; }
+.editor-toggle label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; color: #324377; }
+.editor-toggle small { color: #7a8bb5; }
+.editor-toggle-hint { color: #7a8bb5; font-size: 12px; flex-basis: 100%; }
+
 /* ── Buttons ── */
 .btn {
   border: none; border-radius: 7px; padding: 8px 20px; color: #fff;
@@ -124,6 +131,13 @@ details[open] > summary::before { content: '▼ '; }
   <div class="header">
     <h1>🧹 Helpjuice Word Cleaner Pro</h1>
     <p>v2.0 — transform + validate + report pipeline. Paste Word/PDF HTML; get clean, SEO-checked output.</p>
+  </div>
+
+  <div class="editor-toggle" id="editor-toggle">
+    <span class="editor-toggle-label">Target editor:</span>
+    <label><input type="radio" name="editor" value="ckeditor" checked> CKEditor <small>(Rich Text — default)</small></label>
+    <label><input type="radio" name="editor" value="froala"> Froala <small>(Legacy)</small></label>
+    <span class="editor-toggle-hint">Sets how table borders are emitted. Switch to match the editor you'll paste into.</span>
   </div>
 
   <div class="grid-2">

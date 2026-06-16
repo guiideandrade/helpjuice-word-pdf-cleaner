@@ -163,3 +163,50 @@ describe('list/sublist recognition (mso-list level + glyph fallback)', () => {
     expect(html).toMatch(/<li>L1\s*<ul>\s*<li>L2\s*<ul>\s*<li>L3<\/li>/);
   });
 });
+
+describe('table borders (per-editor) + thead promotion', () => {
+  const TBL = '<table><tr><td>Name</td><td>Role</td></tr><tr><td>Amire</td><td>Dev</td></tr></table>';
+
+  it('borders survive the full pipeline (applyAttrPolicy no longer strips them)', () => {
+    const { html } = runPipeline(TBL); // default: ckeditor
+    expect(html).toContain('hj-cleaned-table');
+    expect(html).toContain('hj-cleaned-cell');
+    expect(html).toMatch(/border-style:\s*solid/);
+    // browsers serialize #cccccc as rgb(204, 204, 204)
+    expect(html).toMatch(/border-color:\s*(#cccccc|rgb\(204,\s*204,\s*204\))/i);
+    expect(html).toMatch(/border-collapse:\s*collapse/);
+  });
+
+  it('applies a border to <th> (promoted header row), not just <td>', () => {
+    const { html } = runPipeline(TBL);
+    expect(html).toMatch(/<th[^>]*scope="col"/);
+    // the th carries the cell class + a border
+    expect(html).toMatch(/<th[^>]*class="hj-cleaned-cell"/);
+    const thChunk = html.slice(html.indexOf('<th'), html.indexOf('</th>'));
+    expect(thChunk).toMatch(/border-style:\s*solid/);
+  });
+
+  it('CKEditor mode omits border-width (CKEditor strips it; class drives exact width)', () => {
+    const { html } = runPipeline(TBL, 'ckeditor');
+    expect(html).not.toMatch(/border-width/);
+  });
+
+  it('Froala mode emits an exact 1px border-width inline', () => {
+    const { html } = runPipeline(TBL, 'froala');
+    expect(html).toMatch(/border-width:\s*1px/);
+  });
+
+  it('drops non-border inline styles on tables (style whitelist is not an injection vector)', () => {
+    const raw = '<table style="position:fixed;border:2px solid red"><tr><td style="position:absolute">x</td></tr></table>';
+    const { html } = runPipeline(raw);
+    expect(html).not.toMatch(/position/);
+    expect(html).toContain('hj-cleaned-table');
+  });
+
+  it('does not keep Word table classes (class is replaced, not appended)', () => {
+    const raw = '<table class="MsoTableGrid"><tr><td>x</td></tr></table>';
+    const { html } = runPipeline(raw);
+    expect(html).not.toMatch(/MsoTableGrid/);
+    expect(html).toContain('hj-cleaned-table');
+  });
+});

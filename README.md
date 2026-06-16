@@ -15,6 +15,8 @@ npm run build    # → dist/index.html (single inlined file)
 
 Paste Word/PDF HTML into the left pane. The tool auto-cleans on paste and renders a report panel with issues grouped by severity. Auto-fixable issues have a one-click fix button. The Copy Clean button is gated on high-severity findings.
 
+Use the **Target editor** toggle to match the Helpjuice editor you'll paste into. It tunes how table borders are emitted: **Froala** (Legacy) keeps inline styles, so the cleaner emits an exact 1px border; **CKEditor** (Rich Text, the default) strips inline `border-width`, so the cleaner emits `border-style`/`border-color` plus the `hj-cleaned-table`/`hj-cleaned-cell` classes for the exact width via theme CSS. Switching the toggle re-cleans the current input.
+
 ## Hosting
 
 `npm run build` produces a single self-contained `dist/index.html` (all JS/CSS inlined via `vite-plugin-singlefile`). It works from any static host **and** from a plain `file://` URL.

@@ -16,6 +16,13 @@ const reportEl   = document.getElementById('report-panel');
 const btnCopyRaw   = document.getElementById('btn-copy-raw');
 const btnCopyClean = document.getElementById('btn-copy-clean');
 const btnClear     = document.getElementById('btn-clear');
+const editorToggle = document.getElementById('editor-toggle');
+
+// Selected target editor ('ckeditor' | 'froala') — drives table-border output.
+function selectedEditor() {
+  const checked = editorToggle?.querySelector('input[name="editor"]:checked');
+  return checked ? checked.value : 'ckeditor';
+}
 
 // ── Alert helpers ─────────────────────────────────────────────────────────────
 function showAlert(msg, type = 'info') {
@@ -33,7 +40,7 @@ function clean() {
 
   try {
     lastRaw = html;
-    lastResult = runPipeline(html);
+    lastResult = runPipeline(html, selectedEditor());
     outputArea.value = lastResult.html;
     refreshReport();
     const issueCount = lastResult.findings.length;
@@ -123,6 +130,11 @@ btnClear.addEventListener('click', () => {
   lastResult = null;
   lastRaw = '';
   hideAlert();
+});
+
+// Re-clean when the target editor changes, so the output matches the selection.
+editorToggle?.addEventListener('change', () => {
+  if (rawArea.value.trim()) clean();
 });
 
 // Auto-clean on paste
